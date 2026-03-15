@@ -19,6 +19,9 @@ tokio       = { version = "1", features = ["full"] }
 # CLI argument parsing
 clap        = { version = "4", features = ["derive"] }
 
+# Binary error propagation
+anyhow      = "1"
+
 # JSON-RPC / LSP message (de)serialization
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
