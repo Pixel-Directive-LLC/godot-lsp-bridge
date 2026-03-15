@@ -1,0 +1,39 @@
+[package]
+name        = "godot-lsp-bridge"
+version     = "0.1.0"
+edition     = "2021"
+description = "High-performance Rust proxy bridging Godot's TCP Language Server to Stdio for Claude Code"
+license     = "MPL-2.0"
+repository  = "https://github.com/Pixel-Directive-LLC/godot-lsp-bridge"
+keywords    = ["godot", "lsp", "language-server", "proxy", "claude-code"]
+categories  = ["development-tools", "network-programming"]
+
+[[bin]]
+name = "godot-lsp-bridge"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio       = { version = "1", features = ["full"] }
+
+# CLI argument parsing
+clap        = { version = "4", features = ["derive"] }
+
+# JSON-RPC / LSP message (de)serialization
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+
+# Structured logging
+tracing             = "0.1"
+tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# Fast test runner (used via `cargo nextest`)
+# nextest itself is a Cargo plugin; no lib dep needed here.
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto       = true
+codegen-units = 1
+strip     = "symbols"
