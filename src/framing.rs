@@ -63,12 +63,14 @@ where
             break;
         }
 
-        if let Some(rest) = trimmed.strip_prefix("Content-Length:") {
-            let len: usize = rest
-                .trim()
-                .parse()
-                .context("invalid Content-Length value")?;
-            content_length = Some(len);
+        if let Some((key, value)) = trimmed.split_once(':') {
+            if key.eq_ignore_ascii_case("Content-Length") {
+                let len: usize = value
+                    .trim()
+                    .parse()
+                    .context("invalid Content-Length value")?;
+                content_length = Some(len);
+            }
         }
         // Other headers (e.g. Content-Type) are ignored per the LSP spec.
     }
