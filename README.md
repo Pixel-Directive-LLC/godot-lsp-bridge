@@ -23,12 +23,12 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
 
 ## Roadmap
 
-- [ ] **Phase 1 — Basic Async TCP/Stdio Proxy (Tokio)**
+- [x] **Phase 1 — Basic Async TCP/Stdio Proxy (Tokio)**
   - Clap CLI (`--port`, `--host`, `--log-level`)
   - Bidirectional `tokio::io::copy` loop between `TcpStream` and `stdin`/`stdout`
   - Graceful shutdown on SIGTERM / Ctrl-C
 
-- [ ] **Phase 2 — JSON-RPC Message Framing**
+- [x] **Phase 2 — JSON-RPC Message Framing**
   - `Content-Length` header parser to prevent packet clipping on LSP boundaries
   - Buffered reader that reconstructs complete JSON-RPC messages before forwarding
   - Unit tests covering fragmented / batched TCP payloads

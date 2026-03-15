@@ -1,12 +1,14 @@
 //! `godot-lsp-bridge` — bidirectional TCP/stdio proxy for Godot's Language Server.
 //!
-//! Connects to Godot's TCP Language Server (default `127.0.0.1:6005`) and forwards
-//! raw bytes between stdin/stdout and the TCP socket, enabling editors that consume
-//! stdio-based LSPs (e.g. Claude Code) to speak with Godot's LSP.
+//! Connects to Godot's TCP Language Server (default `127.0.0.1:6005`) and bridges
+//! stdin/stdout and the TCP socket using JSON-RPC message framing, enabling editors
+//! that consume stdio-based LSPs (e.g. Claude Code) to speak with Godot's LSP.
+
+mod framing;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use tokio::io;
+use tokio::io::{self, BufReader, BufWriter};
 use tokio::net::TcpStream;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -54,19 +56,34 @@ async fn main() -> Result<()> {
     run(stream).await
 }
 
-/// Bridges `stream` bidirectionally with stdin/stdout until EOF or a shutdown signal.
+/// Bridges `stream` bidirectionally with stdin/stdout using LSP message framing.
+///
+/// Each direction reads complete JSON-RPC messages (delimited by `Content-Length`
+/// headers) before forwarding, preventing payload corruption from TCP fragmentation.
 async fn run(stream: TcpStream) -> Result<()> {
-    let (mut tcp_rx, mut tcp_tx) = stream.into_split();
-    let mut stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let (tcp_rx, tcp_tx) = stream.into_split();
+    let mut tcp_reader = BufReader::new(tcp_rx);
+    let mut tcp_writer = BufWriter::new(tcp_tx);
+    let mut stdin = BufReader::new(io::stdin());
+    let mut stdout = BufWriter::new(io::stdout());
 
     tokio::select! {
-        result = io::copy(&mut stdin, &mut tcp_tx) => {
+        result = async {
+            while let Some(msg) = framing::read_message(&mut stdin).await? {
+                framing::write_message(&mut tcp_writer, &msg).await?;
+            }
+            Ok::<_, anyhow::Error>(())
+        } => {
             if let Err(e) = result {
                 tracing::error!("stdin \u{2192} TCP: {e}");
             }
         }
-        result = io::copy(&mut tcp_rx, &mut stdout) => {
+        result = async {
+            while let Some(msg) = framing::read_message(&mut tcp_reader).await? {
+                framing::write_message(&mut stdout, &msg).await?;
+            }
+            Ok::<_, anyhow::Error>(())
+        } => {
             if let Err(e) = result {
                 tracing::error!("TCP \u{2192} stdout: {e}");
             }
