@@ -1,0 +1,20 @@
+name: Auto Approve
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    # Only run if the PR is not a draft AND the author is the repository owner
+    if: |
+      github.event.pull_request.draft == false && 
+      github.event.pull_request.user.login == github.repository_owner
+    
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
