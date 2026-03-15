@@ -35,8 +35,10 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    let filter = EnvFilter::try_new(&args.log_level)
+        .with_context(|| format!("invalid log filter: '{}'", &args.log_level))?;
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new(&args.log_level))
+        .with_env_filter(filter)
         .with_writer(std::io::stderr)
         .init();
 
@@ -69,8 +71,12 @@ async fn run(stream: TcpStream) -> Result<()> {
                 tracing::error!("TCP \u{2192} stdout: {e}");
             }
         }
-        () = shutdown_signal() => {
-            info!("Shutdown signal received, exiting");
+        res = shutdown_signal() => {
+            if let Err(e) = res {
+                tracing::error!("Shutdown signal handler failed: {e}");
+            } else {
+                info!("Shutdown signal received, exiting");
+            }
         }
     }
 
@@ -78,23 +84,23 @@ async fn run(stream: TcpStream) -> Result<()> {
 }
 
 /// Resolves when a shutdown signal is received (Ctrl-C, or SIGTERM on Unix).
-async fn shutdown_signal() {
+async fn shutdown_signal() -> std::io::Result<()> {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{signal, SignalKind};
-        let mut sigterm =
-            signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
+        let mut sigterm = signal(SignalKind::terminate())?;
         tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
+            res = tokio::signal::ctrl_c() => {
+                res?;
+            }
             _ = sigterm.recv() => {}
         }
     }
     #[cfg(not(unix))]
     {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl-C handler");
+        tokio::signal::ctrl_c().await?;
     }
+    Ok(())
 }
 
 #[cfg(test)]
