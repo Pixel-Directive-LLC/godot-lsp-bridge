@@ -33,7 +33,7 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
   - Buffered reader that reconstructs complete JSON-RPC messages before forwarding
   - Unit tests covering fragmented / batched TCP payloads
 
-- [ ] **Phase 3 — Cross-platform CI/CD (GitHub Actions)**
+- [x] **Phase 3 — Cross-platform CI/CD (GitHub Actions)**
   - Matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
   - Gates: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo nextest run`
   - Release artifacts: pre-built binaries uploaded per tag
