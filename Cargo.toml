@@ -30,6 +30,9 @@ serde_json  = "1"
 tracing             = "0.1"
 tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
 
+# Async combinators (join_all for parallel port probing)
+futures             = { version = "0.3", default-features = false, features = ["alloc"] }
+
 [dev-dependencies]
 # Fast test runner (used via `cargo nextest`)
 # nextest itself is a Cargo plugin; no lib dep needed here.

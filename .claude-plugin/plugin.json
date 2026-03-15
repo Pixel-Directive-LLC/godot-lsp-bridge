@@ -1,0 +1,17 @@
+{
+  "name": "godot-gdscript",
+  "displayName": "Godot GDScript Language Server",
+  "version": "0.1.0",
+  "languages": [
+    {
+      "id": "gdscript",
+      "extensions": [".gd"],
+      "aliases": ["GDScript", "gdscript"]
+    }
+  ],
+  "lsp": {
+    "transport": "stdio",
+    "command": "godot-lsp-bridge",
+    "args": []
+  }
+}
