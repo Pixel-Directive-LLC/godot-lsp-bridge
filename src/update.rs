@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use std::env;
 use std::io::Read;
 use std::path::Path;
+#[cfg(not(windows))]
+use std::path::PathBuf;
 const RELEASES_API: &str =
     "https://api.github.com/repos/Pixel-Directive-LLC/godot-lsp-bridge/releases/latest";
 
