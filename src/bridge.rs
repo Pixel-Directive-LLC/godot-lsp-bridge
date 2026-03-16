@@ -33,34 +33,40 @@ pub async fn run(stream: TcpStream) -> Result<RunOutcome> {
     let mut stdout = BufWriter::new(io::stdout());
 
     let outcome = tokio::select! {
-        result = async {
-            while let Some(msg) = framing::read_message(&mut stdin).await? {
-                framing::write_message(&mut tcp_writer, &msg).await?;
-            }
-            Ok::<_, anyhow::Error>(RunOutcome::StdinClosed)
-        } => {
-            match result {
-                Ok(outcome) => outcome,
-                Err(e) => {
-                    tracing::error!("stdin → TCP: {e}");
-                    RunOutcome::StdinClosed
+        outcome = async {
+            loop {
+                match framing::read_message(&mut stdin).await {
+                    Ok(Some(msg)) => {
+                        if let Err(e) = framing::write_message(&mut tcp_writer, &msg).await {
+                            tracing::error!("stdin → TCP (write): {e}");
+                            return RunOutcome::TcpClosed;
+                        }
+                    }
+                    Ok(None) => return RunOutcome::StdinClosed,
+                    Err(e) => {
+                        tracing::error!("stdin → TCP (read): {e}");
+                        return RunOutcome::StdinClosed;
+                    }
                 }
             }
-        }
-        result = async {
-            while let Some(msg) = framing::read_message(&mut tcp_reader).await? {
-                framing::write_message(&mut stdout, &msg).await?;
-            }
-            Ok::<_, anyhow::Error>(RunOutcome::TcpClosed)
-        } => {
-            match result {
-                Ok(outcome) => outcome,
-                Err(e) => {
-                    tracing::error!("TCP → stdout: {e}");
-                    RunOutcome::TcpClosed
+        } => outcome,
+        outcome = async {
+            loop {
+                match framing::read_message(&mut tcp_reader).await {
+                    Ok(Some(msg)) => {
+                        if let Err(e) = framing::write_message(&mut stdout, &msg).await {
+                            tracing::error!("TCP → stdout (write): {e}");
+                            return RunOutcome::StdinClosed;
+                        }
+                    }
+                    Ok(None) => return RunOutcome::TcpClosed,
+                    Err(e) => {
+                        tracing::error!("TCP → stdout (read): {e}");
+                        return RunOutcome::TcpClosed;
+                    }
                 }
             }
-        }
+        } => outcome,
         res = shutdown_signal() => {
             match res {
                 Ok(()) => info!("Shutdown signal received, exiting"),

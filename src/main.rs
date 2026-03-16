@@ -13,7 +13,7 @@ mod framing;
 use anyhow::Result;
 use bridge::RunOutcome;
 use clap::Parser;
-use discovery::{connect_with_backoff, enumerate_candidates, probe_port, DEFAULT_RETRY_TIMEOUT};
+use discovery::{connect_with_backoff, enumerate_candidates, DEFAULT_RETRY_TIMEOUT};
 use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -123,9 +123,6 @@ async fn resolve_port(host: &str, timeout: Duration) -> Result<u16> {
                 port_list.join(", "),
                 ports[0]
             );
-            // Consume the already-probed stream by probing again.  The probe timeout
-            // is short so this adds negligible latency.
-            let _ = probe_port(host, ports[0]).await;
             Ok(ports[0])
         }
     }
