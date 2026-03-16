@@ -18,47 +18,28 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
 
 ## Installation
 
-### Option 1 — Pre-built binary (recommended)
+Install directly from the Claude Code marketplace:
 
-```bash
-# macOS / Linux
-curl -L https://github.com/Pixel-Directive-LLC/godot-lsp-bridge/releases/latest/download/godot-lsp-bridge-x86_64-unknown-linux-gnu.tar.gz | tar xz
-sudo mv godot-lsp-bridge /usr/local/bin/
+```shell
+/plugin marketplace add Pixel-Directive-LLC/godot-lsp-bridge
+/plugin install godot-gdscript@godot-lsp-bridge
 ```
 
-```powershell
-# Windows (PowerShell)
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.local\bin" -ErrorAction SilentlyContinue
-Invoke-WebRequest -Uri "https://github.com/Pixel-Directive-LLC/godot-lsp-bridge/releases/latest/download/godot-lsp-bridge-x86_64-pc-windows-msvc.zip" -OutFile bridge.zip
-Expand-Archive bridge.zip -DestinationPath "$env:USERPROFILE\.local\bin" -Force
-Remove-Item bridge.zip
-```
+Open Godot with a project — GDScript LSP starts automatically on port 6005. Open any `.gd` file — GDScript intelligence is live.
 
-> **Note:** Add `%USERPROFILE%\.local\bin` to your `PATH` environment variable if it is not already present.
-
-See the [Releases page][releases] for all platform downloads and SHA-256 checksums.
-
-### Option 2 — Build from source
+**Build from source** (contributors or platforms without pre-built binaries):
 
 ```bash
 cargo install --git https://github.com/Pixel-Directive-LLC/godot-lsp-bridge
 ```
 
----
-
-## Claude Code Plugin Setup
-
-1. Put `godot-lsp-bridge` on your `PATH` (see [Installation](#installation) above)
-2. Open Godot with a project — GDScript LSP starts automatically on port 6005
-3. Add the plugin to Claude Code:
+Then add to Claude Code manually:
 
 ```bash
 claude mcp add --transport stdio godot-gdscript godot-lsp-bridge
 ```
 
-4. Open a `.gd` file in your project — GDScript intelligence is live
-
-**Manual configuration** — add to `~/.claude/settings.json`:
+Or add directly to `~/.claude/settings.json`:
 
 ```json
 {
@@ -101,25 +82,6 @@ All flags below are **stable** as of v1.0.
 | `--log-level <LEVEL>` | `info` | Tracing level (`error`/`warn`/`info`/`debug`/`trace`) |
 
 The `RUST_LOG` environment variable is also honoured (tracing-subscriber env-filter).
-
----
-
-## Verify Release Signatures
-
-Every release artifact is signed with [Sigstore/cosign][cosign] keyless signing and includes a SHA-256 checksum file.
-
-```bash
-# Verify checksum
-sha256sum --check godot-lsp-bridge-x86_64-unknown-linux-gnu.tar.gz.sha256
-
-# Verify cosign signature (requires cosign installed)
-cosign verify-blob \
-  --certificate godot-lsp-bridge-x86_64-unknown-linux-gnu.tar.gz.pem \
-  --signature godot-lsp-bridge-x86_64-unknown-linux-gnu.tar.gz.sig \
-  --certificate-identity-regexp "https://github.com/Pixel-Directive-LLC/godot-lsp-bridge" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  godot-lsp-bridge-x86_64-unknown-linux-gnu.tar.gz
-```
 
 ---
 
@@ -170,6 +132,12 @@ cosign verify-blob \
   - Full integration test suite against a live Godot LSP instance (`#[ignore]` in CI)
   - Binary installation commands and Claude Code plugin setup in README
 
+- [x] **Phase 7 — Marketplace Distribution**
+  - `.lsp.json` at repo root with `extensionToLanguage` mapping
+  - `.claude-plugin/plugin.json` updated with full marketplace metadata
+  - `.claude-plugin/marketplace.json` — repo self-hosts the marketplace
+  - Single-command install via `/plugin marketplace add` + `/plugin install`
+
 ---
 
 ## Development
@@ -218,4 +186,3 @@ MPL-2.0 — see [LICENSE](./LICENSE).
 *Pixel Directive, LLC — [pixeldirective.com](https://pixeldirective.com)*
 
 [releases]: https://github.com/Pixel-Directive-LLC/godot-lsp-bridge/releases
-[cosign]: https://docs.sigstore.dev/cosign/overview/
