@@ -18,20 +18,28 @@ use tokio::net::TcpStream;
 
 // NOTE: requires Godot editor open with a project
 
+/// Discovers a live Godot LSP port, panicking with a clear message if none is found.
+///
+/// Shared by all integration tests to avoid repeating the discovery + prerequisite-check
+/// boilerplate.
+async fn find_live_godot_port() -> u16 {
+    let candidates = enumerate_candidates("127.0.0.1").await;
+    assert!(
+        !candidates.is_empty(),
+        "No Godot LSP found on ports 6005\u{2013}6014. \
+         Open a Godot project and re-run with `cargo nextest run --ignored`."
+    );
+    candidates[0]
+}
+
 /// Verifies that `enumerate_candidates` finds at least one open Godot LSP port.
 ///
 /// Covers UC2 (Godot already running) — the most common developer workflow.
 #[tokio::test]
 #[ignore]
 async fn connect_to_live_godot() {
-    let candidates = enumerate_candidates("127.0.0.1").await;
-    assert!(
-        !candidates.is_empty(),
-        "No Godot LSP found on ports 6005–6014. \
-         Open a Godot project and re-run with `cargo nextest run --ignored`."
-    );
-    // Confirm we can actually connect to the first candidate.
-    let port = candidates[0];
+    let port = find_live_godot_port().await;
+    // Confirm we can actually connect to the discovered port.
     let stream = probe_port("127.0.0.1", port).await;
     assert!(
         stream.is_some(),
@@ -47,14 +55,8 @@ async fn connect_to_live_godot() {
 #[tokio::test]
 #[ignore]
 async fn framing_round_trip_live() {
-    let candidates = enumerate_candidates("127.0.0.1").await;
-    assert!(
-        !candidates.is_empty(),
-        "No Godot LSP found on ports 6005–6014. \
-         Open a Godot project and re-run with `cargo nextest run --ignored`."
-    );
+    let port = find_live_godot_port().await;
 
-    let port = candidates[0];
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .expect("failed to connect to Godot LSP");
@@ -109,14 +111,8 @@ async fn framing_round_trip_live() {
 async fn bridge_runs_against_live_godot() {
     use godot_lsp_bridge::bridge::{run, RunOutcome};
 
-    let candidates = enumerate_candidates("127.0.0.1").await;
-    assert!(
-        !candidates.is_empty(),
-        "No Godot LSP found on ports 6005–6014. \
-         Open a Godot project and re-run with `cargo nextest run --ignored`."
-    );
+    let port = find_live_godot_port().await;
 
-    let port = candidates[0];
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .expect("failed to connect to Godot LSP");

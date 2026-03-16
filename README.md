@@ -28,9 +28,13 @@ sudo mv godot-lsp-bridge /usr/local/bin/
 
 ```powershell
 # Windows (PowerShell)
+New-Item -ItemType Directory -Path "$env:USERPROFILE\.local\bin" -ErrorAction SilentlyContinue
 Invoke-WebRequest -Uri "https://github.com/Pixel-Directive-LLC/godot-lsp-bridge/releases/latest/download/godot-lsp-bridge-x86_64-pc-windows-msvc.zip" -OutFile bridge.zip
-Expand-Archive bridge.zip .; Move-Item godot-lsp-bridge.exe $env:USERPROFILE\.local\bin\
+Expand-Archive bridge.zip -DestinationPath "$env:USERPROFILE\.local\bin" -Force
+Remove-Item bridge.zip
 ```
+
+> **Note:** Add `%USERPROFILE%\.local\bin` to your `PATH` environment variable if it is not already present.
 
 See the [Releases page][releases] for all platform downloads and SHA-256 checksums.
 
