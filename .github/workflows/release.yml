@@ -6,9 +6,36 @@ on:
       - 'v*'
 
 jobs:
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract tag
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --generate-notes
+
   upload-assets:
-    name: Release (${{ matrix.target }})
+    name: Upload (${{ matrix.target }})
+    needs: create-release
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -34,4 +61,33 @@ jobs:
         with:
           bin: godot-lsp-bridge
           target: ${{ matrix.target }}
+          checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  sign-release:
+    name: Sign release artifacts
+    needs: [create-release, upload-assets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Download and sign archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.create-release.outputs.tag }}
+        run: |
+          gh release download "$TAG" \
+            --repo Pixel-Directive-LLC/godot-lsp-bridge \
+            --pattern '*.tar.gz' --pattern '*.zip' \
+            --dir ./artifacts
+          for f in ./artifacts/*.tar.gz ./artifacts/*.zip; do
+            [ -f "$f" ] || continue
+            base="$(basename "$f")"
+            cosign sign-blob --yes "$f" --bundle "./artifacts/${base}.cosign.bundle"
+            gh release upload "$TAG" "./artifacts/${base}.cosign.bundle" \
+              --repo Pixel-Directive-LLC/godot-lsp-bridge --clobber
+          done
