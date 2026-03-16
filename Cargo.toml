@@ -53,7 +53,7 @@ zip    = { version = "2", default-features = false, features = ["deflate"] }
 # nextest itself is a Cargo plugin; no lib dep needed here.
 tokio-test = "0.4"
 
-# cargo-binstall metadata â€” maps release asset names to install targets.
+# cargo-binstall metadata — maps release asset names to install targets.
 # Asset naming convention: godot-lsp-bridge-{target}.tar.gz / .zip (Windows)
 # See: https://github.com/cargo-bins/cargo-binstall
 [package.metadata.binstall]
