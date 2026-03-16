@@ -6,14 +6,12 @@
 //! switch — covering the four real-world launch sequences (UC1–UC4) described in the
 //! Phase 4 design.
 
-mod bridge;
-mod discovery;
-mod framing;
-
 use anyhow::Result;
-use bridge::RunOutcome;
 use clap::Parser;
-use discovery::{connect_with_backoff, enumerate_candidates, DEFAULT_RETRY_TIMEOUT};
+use godot_lsp_bridge::bridge::{self, RunOutcome};
+use godot_lsp_bridge::discovery::{
+    connect_with_backoff, enumerate_candidates, DEFAULT_RETRY_TIMEOUT,
+};
 use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::EnvFilter;

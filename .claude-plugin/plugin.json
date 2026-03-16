@@ -1,7 +1,7 @@
 {
   "name": "godot-gdscript",
   "displayName": "Godot GDScript Language Server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "languages": [
     {
       "id": "gdscript",
