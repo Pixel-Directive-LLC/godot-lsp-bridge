@@ -47,10 +47,10 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
   - Hot-reconnect on in-session Godot project switch (UC4)
   - [Setup documentation](./docs/setup.md) for one-click configuration
 
-- [ ] **Phase 5 — Release Preparation**
+- [x] **Phase 5 — Release Preparation**
   - Versioned release tags with pre-built binaries for all platforms
-  - Automated release notes from conventional commits
-  - Checksum and signature verification for release artifacts
+  - Automated release notes generated from PR labels and conventional commits
+  - SHA-256 checksum and Sigstore/cosign keyless signature verification for all release artifacts
 
 - [ ] **Phase 6 — v1.0**
   - Stable public API and CLI contract
