@@ -37,6 +37,17 @@ tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
 # Async combinators (join_all for parallel port probing)
 futures             = { version = "0.3", default-features = false, features = ["alloc"] }
 
+# HTTP client for update subcommand (rustls avoids OpenSSL dep on all platforms)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+
+# Platform config/home directory resolution
+dirs = "5"
+
+# Archive extraction for update subcommand
+flate2 = "1"
+tar    = "0.4"
+zip    = { version = "2", default-features = false, features = ["deflate"] }
+
 [dev-dependencies]
 # Fast test runner (used via `cargo nextest`)
 # nextest itself is a Cargo plugin; no lib dep needed here.
