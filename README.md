@@ -21,7 +21,7 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
 Install directly from the Claude Code marketplace:
 
 ```shell
-/plugin marketplace add Pixel-Directive-LLC/godot-lsp-bridge
+/plugin marketplace add https://github.com/Pixel-Directive-LLC/godot-lsp-bridge.git
 /plugin install godot-lsp-bridge@godot-lsp-bridge
 ```
 
