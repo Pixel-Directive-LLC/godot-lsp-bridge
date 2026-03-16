@@ -38,22 +38,44 @@ A high-performance Rust proxy that bridges Godot's TCP Language Server (port 600
   - Gates: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo nextest run`
   - Release artifacts: pre-built binaries uploaded per tag
 
-- [ ] **Phase 4 — Claude Code Plugin Manifest**
+- [x] **Phase 4 — Claude Code Plugin Manifest**
   - `.claude-plugin/plugin.json` with stdin transport declaration
-  - Auto-discovery of running Godot editor instance via port probe
-  - Documentation for one-click setup inside Claude Code settings
+  - Auto-discovery of running Godot instances via concurrent port probe (ports 6005–6014)
+  - Exponential-backoff retry when Godot has not yet started (UC1)
+  - Immediate connection when Godot is already running (UC2)
+  - Ambiguity report with port list when multiple instances are open (UC3)
+  - Hot-reconnect on in-session Godot project switch (UC4)
+  - [Setup documentation](./docs/setup.md) for one-click configuration
+
+- [ ] **Phase 5 — Release Preparation**
+  - Versioned release tags with pre-built binaries for all platforms
+  - Automated release notes from conventional commits
+  - Checksum and signature verification for release artifacts
+
+- [ ] **Phase 6 — v1.0**
+  - Stable public API and CLI contract
+  - Full integration test suite against a live Godot LSP instance
+  - Published to crates.io and package managers (Homebrew, winget)
 
 ---
 
-## Quick Start (Phase 1, once implemented)
+## Quick Start
 
 ```bash
 # Build
 cargo build --release
 
-# Run (Godot editor must be open with LSP enabled on port 6005)
+# Auto-discover and connect (Godot editor should be open)
+./target/release/godot-lsp-bridge
+
+# Connect to a specific port (skips auto-discovery)
 ./target/release/godot-lsp-bridge --port 6005
+
+# Wait up to 10 minutes for Godot to start (UC1)
+./target/release/godot-lsp-bridge --connect-timeout 600
 ```
+
+See [docs/setup.md](./docs/setup.md) for Claude Code plugin configuration.
 
 ---
 
