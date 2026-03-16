@@ -1,0 +1,9 @@
+{
+  "gdscript": {
+    "command": "godot-lsp-bridge",
+    "args": [],
+    "extensionToLanguage": {
+      ".gd": "gdscript"
+    }
+  }
+}
