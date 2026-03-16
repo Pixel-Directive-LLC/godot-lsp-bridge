@@ -62,6 +62,13 @@ pub async fn run() -> Result<()> {
         .as_str()
         .context("release metadata missing tag_name")?;
 
+    // Short-circuit if already on the latest version.
+    let current = concat!("v", env!("CARGO_PKG_VERSION"));
+    if tag == current {
+        println!("Already up to date ({current}).");
+        return Ok(());
+    }
+
     println!("Latest release: {tag}");
 
     // Locate the asset for this platform.
@@ -194,7 +201,11 @@ fn extract_from_zip(data: &[u8], binary_name: &str) -> Result<Vec<u8>> {
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).context("failed to read zip entry")?;
-        if file.name().ends_with(binary_name) {
+        if std::path::Path::new(file.name())
+            .file_name()
+            .and_then(|n| n.to_str())
+            == Some(binary_name)
+        {
             let mut buf = Vec::new();
             file.read_to_end(&mut buf)
                 .context("failed to read binary from zip")?;
@@ -258,6 +269,7 @@ fn ensure_path_unix(dir: &Path) -> Result<()> {
         .split(':')
         .any(|p| p == dir_str.as_ref())
     {
+        println!("{dir_str} is already on PATH.");
         return Ok(());
     }
 

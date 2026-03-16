@@ -34,9 +34,9 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// Godot LSP host address.
-    #[arg(long, default_value = "127.0.0.1")]
-    host: String,
+    /// Godot LSP host address [default: 127.0.0.1].
+    #[arg(long)]
+    host: Option<String>,
 
     /// Godot LSP port. When omitted the bridge auto-discovers running Godot instances
     /// by probing ports 6005–6014. Set explicitly to bypass auto-discovery.
@@ -151,16 +151,13 @@ async fn main() -> Result<()> {
 }
 
 impl Cli {
-    /// Returns the host from the CLI flag; falls back to the config value then the flag default.
-    fn host_or_config<'a>(&'a self, config_host: Option<&'a str>) -> String {
-        // `--host` has a default value so `self.host` is always populated.
-        // Prefer the CLI value when it differs from the hard-coded default, meaning the
-        // user explicitly passed `--host`; otherwise fall back to the config file.
-        if self.host != "127.0.0.1" {
-            self.host.clone()
-        } else {
-            config_host.unwrap_or(&self.host).to_owned()
-        }
+    /// Returns the host with priority: CLI flag → config file → built-in default.
+    fn host_or_config(&self, config_host: Option<&str>) -> String {
+        self.host
+            .as_deref()
+            .or(config_host)
+            .unwrap_or("127.0.0.1")
+            .to_owned()
     }
 
     /// Returns the port from the CLI flag, falling back to the config value.
@@ -213,7 +210,7 @@ mod tests {
     #[test]
     fn default_args_parse() {
         let cli = Cli::parse_from(["godot-lsp-bridge"]);
-        assert_eq!(cli.host, "127.0.0.1");
+        assert!(cli.host.is_none());
         assert!(cli.port.is_none());
         assert_eq!(cli.connect_timeout, DEFAULT_RETRY_TIMEOUT.as_secs());
         assert_eq!(cli.log_level, "info");
@@ -239,7 +236,7 @@ mod tests {
             "--connect-timeout",
             "60",
         ]);
-        assert_eq!(cli.host, "0.0.0.0");
+        assert_eq!(cli.host.as_deref(), Some("0.0.0.0"));
         assert_eq!(cli.port, Some(6006));
         assert_eq!(cli.log_level, "debug");
         assert_eq!(cli.connect_timeout, 60);
