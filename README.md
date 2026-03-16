@@ -22,7 +22,7 @@ Install directly from the Claude Code marketplace:
 
 ```shell
 /plugin marketplace add Pixel-Directive-LLC/godot-lsp-bridge
-/plugin install godot-gdscript@godot-lsp-bridge
+/plugin install godot-lsp-bridge@godot-lsp-bridge
 ```
 
 Open Godot with a project — GDScript LSP starts automatically on port 6005. Open any `.gd` file — GDScript intelligence is live.
@@ -36,7 +36,7 @@ cargo install --git https://github.com/Pixel-Directive-LLC/godot-lsp-bridge
 Then add to Claude Code manually:
 
 ```bash
-claude mcp add --transport stdio godot-gdscript godot-lsp-bridge
+claude mcp add --transport stdio godot-lsp-bridge godot-lsp-bridge
 ```
 
 Or add directly to `~/.claude/settings.json`:
@@ -44,7 +44,7 @@ Or add directly to `~/.claude/settings.json`:
 ```json
 {
   "lsp": {
-    "godot-gdscript": {
+    "godot-lsp-bridge": {
       "transport": "stdio",
       "command": "godot-lsp-bridge",
       "args": []
