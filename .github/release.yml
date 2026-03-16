@@ -6,6 +6,16 @@ changelog:
     - title: Bug Fixes
       labels:
         - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Refactoring
+      labels:
+        - refactor
+    - title: Build System & CI
+      labels:
+        - ci
+        - build
     - title: Other Changes
       labels:
         - "*"
