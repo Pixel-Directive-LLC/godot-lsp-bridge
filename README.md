@@ -78,18 +78,26 @@ That's it. Open Godot with a project, open any `.gd` file in Claude Code, and GD
 
 ## CLI Reference
 
+### Proxy flags
+
 All flags below are **stable** as of v1.0.
 
 | Flag | Default | Description |
 |---|---|---|
+| `--version` | — | Print version and exit |
 | `--host <ADDR>` | `127.0.0.1` | Godot LSP host |
 | `--port <N>` | *(auto-detect)* | Skip discovery; connect to explicit port |
 | `--connect-timeout <SECS>` | `300` | Max wait time for Godot to appear |
 | `--log-level <LEVEL>` | `info` | Tracing level (`error`/`warn`/`info`/`debug`/`trace`) |
 
+Resolution order for `--host` and `--port`: CLI flag → config file → built-in default.
+
 The `RUST_LOG` environment variable is also honoured (tracing-subscriber env-filter).
 
 ```bash
+# Print the installed version
+godot-lsp-bridge --version
+
 # Auto-discover Godot on ports 6005–6014 (Godot editor must be open)
 godot-lsp-bridge
 
@@ -98,6 +106,60 @@ godot-lsp-bridge --port 6005
 
 # Wait up to 10 minutes for Godot to start
 godot-lsp-bridge --connect-timeout 600
+```
+
+### Subcommands
+
+#### `update`
+
+Download and install the latest release, then ensure the install directory is on `PATH`.
+
+```bash
+godot-lsp-bridge update
+```
+
+- Fetches release metadata from GitHub, downloads the platform-appropriate archive, and atomically replaces the running binary.
+- If the install directory is not already on `PATH`, it is added automatically (shell rc file on Linux/macOS; User PATH via PowerShell on Windows).
+
+#### `doctor`
+
+Check the environment and report diagnostics. Exits with code 1 if any check fails.
+
+```bash
+godot-lsp-bridge doctor
+```
+
+Checks:
+
+1. **Binary in PATH** — confirms `godot-lsp-bridge` is reachable from the shell.
+2. **Godot LSP reachable** — probes the configured `host:port` with a 2-second TCP timeout.
+
+Host and port are resolved using the same priority as proxy mode (CLI flag → config file → built-in default). Unlike proxy mode, `doctor` does not perform auto-discovery and defaults to port `6005`. Pass `--host` or `--port` to test a non-default target:
+
+```bash
+godot-lsp-bridge --port 6007 doctor
+```
+
+#### `config`
+
+Read or write persistent host/port defaults. Settings are stored in a JSON file under the platform config directory:
+
+| Platform | Path |
+|---|---|
+| Windows | `%APPDATA%\godot-lsp-bridge\config.json` |
+| macOS | `~/Library/Application Support/godot-lsp-bridge/config.json` |
+| Linux | `~/.config/godot-lsp-bridge/config.json` |
+
+Supported keys: `host`, `port`.
+
+```bash
+# Read a value (prints "(not set)" if absent)
+godot-lsp-bridge config get host
+godot-lsp-bridge config get port
+
+# Write a value
+godot-lsp-bridge config set host 192.168.1.10
+godot-lsp-bridge config set port 6007
 ```
 
 ---
