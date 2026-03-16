@@ -134,7 +134,7 @@ Checks:
 1. **Binary in PATH** — confirms `godot-lsp-bridge` is reachable from the shell.
 2. **Godot LSP reachable** — probes the configured `host:port` with a 2-second TCP timeout.
 
-Host and port are resolved using the same priority as proxy mode (CLI flag → config file → built-in default). Pass `--host` or `--port` to test a non-default target:
+Host and port are resolved using the same priority as proxy mode (CLI flag → config file → built-in default). Unlike proxy mode, `doctor` does not perform auto-discovery and defaults to port `6005`. Pass `--host` or `--port` to test a non-default target:
 
 ```bash
 godot-lsp-bridge --port 6007 doctor
