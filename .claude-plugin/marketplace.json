@@ -3,6 +3,9 @@
   "owner": {
     "name": "Pixel Directive, LLC"
   },
+  "metadata": {
+    "description": "GDScript language server plugin for Claude Code — powered by Godot's native LSP."
+  },
   "plugins": [
     {
       "name": "godot-gdscript",
