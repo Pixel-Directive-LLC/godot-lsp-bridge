@@ -1,6 +1,6 @@
 [package]
 name        = "godot-lsp-bridge"
-version     = "1.1.0"
+version     = "1.2.0"
 edition     = "2021"
 description = "High-performance Rust proxy bridging Godot's TCP Language Server to Stdio for Claude Code"
 license     = "MPL-2.0"
