@@ -161,7 +161,11 @@ async fn handle_client_message(
         // Intercepted: synthesise workspace/symbol locally.
         Some("workspace/symbol") => {
             if let Some(id) = id {
-                let query = params["query"].as_str().unwrap_or("").to_owned();
+                let query = params
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_owned();
                 let to_tcp2 = to_tcp.clone();
                 let to_stdout2 = to_stdout.clone();
                 tokio::spawn(crate::synthesizer::workspace_symbol(

@@ -136,8 +136,8 @@ pub fn make_error(id: &Value, code: i64, message: &str) -> Vec<u8> {
 fn flatten_doc_symbols(symbols: &[Value], uri: &str, container: Option<&str>) -> Vec<Value> {
     let mut out = Vec::new();
     for sym in symbols {
-        let name = sym["name"].as_str().unwrap_or("?");
-        let kind = &sym["kind"];
+        let name = sym.get("name").and_then(Value::as_str).unwrap_or("?");
+        let kind = sym.get("kind").unwrap_or(&Value::Null);
         let range = sym
             .get("selectionRange")
             .or_else(|| sym.get("range"))
@@ -170,8 +170,8 @@ fn in_range(position: &Value, range: &Value) -> bool {
         )
     }
     let (pl, pc) = lc(position);
-    let (sl, sc) = lc(&range["start"]);
-    let (el, ec) = lc(&range["end"]);
+    let (sl, sc) = lc(range.get("start").unwrap_or(&Value::Null));
+    let (el, ec) = lc(range.get("end").unwrap_or(&Value::Null));
     if pl < sl || pl > el {
         return false;
     }
@@ -286,7 +286,11 @@ pub async fn prepare_call_hierarchy(
     position: Value,
     to_stdout: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    let uri = text_document["uri"].as_str().unwrap_or("").to_owned();
+    let uri = text_document
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
     let (sub_id, rx) = synth.lock().await.alloc_sub();
 
     let _ = to_tcp.send(make_request(
@@ -313,8 +317,8 @@ pub async fn prepare_call_hierarchy(
 
     let item = match find_symbol_at(symbols, &position) {
         Some(sym) => {
-            let name = sym["name"].as_str().unwrap_or("?");
-            let kind = &sym["kind"];
+            let name = sym.get("name").and_then(Value::as_str).unwrap_or("?");
+            let kind = sym.get("kind").unwrap_or(&Value::Null);
             let range = sym.get("range").cloned().unwrap_or(Value::Null);
             let sel = sym
                 .get("selectionRange")
@@ -350,10 +354,16 @@ pub async fn incoming_calls(
     item: Value,
     to_stdout: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    let uri = item["uri"].as_str().unwrap_or("").to_owned();
-    let position = item["selectionRange"]["start"].clone().pipe_or(
-        json!({"line": 0, "character": 0}),
-    );
+    let uri = item
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let position = item
+        .get("selectionRange")
+        .and_then(|sr| sr.get("start"))
+        .cloned()
+        .unwrap_or_else(|| json!({"line": 0, "character": 0}));
 
     let (sub_id, rx) = synth.lock().await.alloc_sub();
     let _ = to_tcp.send(make_request(
@@ -411,7 +421,11 @@ pub async fn outgoing_calls(
     item: Value,
     to_stdout: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    let uri = item["uri"].as_str().unwrap_or("").to_owned();
+    let uri = item
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
     let item_range = item.get("range").cloned().unwrap_or(Value::Null);
 
     let (sub_id, rx) = synth.lock().await.alloc_sub();
@@ -448,9 +462,13 @@ pub async fn outgoing_calls(
                 .unwrap_or(false)
         })
         .map(|sym| {
-            let name = sym["name"].as_str().unwrap_or("?");
-            let kind = &sym["kind"];
-            let range = sym["location"]["range"].clone();
+            let name = sym.get("name").and_then(Value::as_str).unwrap_or("?");
+            let kind = sym.get("kind").unwrap_or(&Value::Null);
+            let range = sym
+                .get("location")
+                .and_then(|loc| loc.get("range"))
+                .cloned()
+                .unwrap_or(Value::Null);
             json!({
                 "to": {
                     "name":           name,
@@ -465,23 +483,6 @@ pub async fn outgoing_calls(
         .collect();
 
     let _ = to_stdout.send(make_response(&original_id, Value::Array(calls)));
-}
-
-// ── Helper trait for Option chaining ─────────────────────────────────────────
-
-/// Extension trait for replacing a `Value::Null` with a fallback.
-trait PipeOr {
-    fn pipe_or(self, fallback: Value) -> Value;
-}
-
-impl PipeOr for Value {
-    fn pipe_or(self, fallback: Value) -> Value {
-        if self.is_null() {
-            fallback
-        } else {
-            self
-        }
-    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
