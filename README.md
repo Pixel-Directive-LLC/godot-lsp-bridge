@@ -248,6 +248,12 @@ cargo install --git https://github.com/Pixel-Directive-LLC/godot-lsp-bridge
 
 ---
 
+## Privacy Policy
+
+[pixeldirective.com/privacy-policy][privacy]
+
+---
+
 ## License
 
 MPL-2.0 — see [LICENSE](./LICENSE).
@@ -259,3 +265,4 @@ MPL-2.0 — see [LICENSE](./LICENSE).
 [nextest]: https://nexte.st/
 [bacon]: https://dystroy.org/bacon/
 [releases]: https://github.com/Pixel-Directive-LLC/godot-lsp-bridge/releases
+[privacy]: https://pixeldirective.com/privacy-policy/
