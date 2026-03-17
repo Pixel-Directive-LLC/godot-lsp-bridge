@@ -164,6 +164,35 @@ godot-lsp-bridge config set port 6007
 
 ---
 
+## LSP Feature Support
+
+The bridge passes most LSP traffic straight through to Godot.  A small set of
+methods that Godot does not implement are **synthesised** by the bridge using
+Godot's available primitives.
+
+| LSP Method | Status | Notes |
+|---|---|---|
+| `initialize` / `initialized` | Native | Godot handles directly |
+| `textDocument/completion` | Native | Full GDScript completion |
+| `textDocument/hover` | Native | Type info and docs |
+| `textDocument/definition` | Native | Go-to-definition |
+| `textDocument/references` | Native | Find all references |
+| `textDocument/documentSymbol` | Native | Symbols in current file |
+| `textDocument/signatureHelp` | Native | Function signature hints |
+| `textDocument/didOpen` / `didChange` / `didClose` | Native | Document sync |
+| `textDocument/publishDiagnostics` | Pass-through | Server-push notification; forwarded intact |
+| `workspace/symbol` | **Synthesised** | Aggregates `documentSymbol` across open files; filters by query string |
+| `textDocument/prepareCallHierarchy` | **Synthesised** | Resolves the symbol at the cursor via `documentSymbol` |
+| `callHierarchy/incomingCalls` | **Synthesised** | Finds callers via `references` at the item's selection range |
+| `callHierarchy/outgoingCalls` | **Synthesised** | Finds contained symbols via `documentSymbol` within the item's range |
+| `workspace/applyEdit` | Pass-through | Server-initiated; forwarded to client |
+
+Synthesised responses are best-effort approximations based on the information
+Godot exposes.  They degrade gracefully to empty results when Godot is
+unavailable or returns unexpected data.
+
+---
+
 ## Why Rust?
 
 | Concern | Rust advantage |
