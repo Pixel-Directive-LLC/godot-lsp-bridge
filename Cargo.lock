@@ -407,6 +407,7 @@ dependencies = [
  "dirs",
  "flate2",
  "futures",
+ "percent-encoding",
  "reqwest",
  "serde",
  "serde_json",

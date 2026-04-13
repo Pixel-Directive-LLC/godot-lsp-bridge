@@ -178,21 +178,13 @@ async fn run_godot_validation(
     script_file.flush()?;
     let script_path = script_file.path().to_path_buf();
 
-    // Resolve the res:// path relative to the project.
-    // The shader file_path is an absolute OS path.  Godot's --script loads from the
-    // filesystem, but the shader itself must be referenced as a res:// path so that
-    // Godot's resource loader can find it within the project.
+    // The shader file_path is an absolute OS path. Godot's `load()` function,
+    // which is used by the validation script, requires a `res://` path to find
+    // the resource within the project.
     //
-    // We pass the absolute path and let the script use it directly — Godot's load()
-    // accepts res:// paths, so we need to figure out the project root.
-    // For simplicity, we pass the OS path and let the user's project.godot handle it.
-    // Actually, the script receives the path via OS.get_cmdline_user_args(), and load()
-    // requires a res:// path.  We'll pass the absolute path and have Godot try to
-    // resolve it.  If the file is within a Godot project, load() with an absolute path
-    // won't work — we need the res:// path.
-    //
-    // Strategy: find the nearest project.godot ancestor, compute the relative path,
-    // and prefix with "res://".
+    // To resolve this, we find the nearest `project.godot` ancestor to determine
+    // the project root, compute the relative path from there, and prefix it
+    // with "res://".
     let res_path = to_res_path(file_path)?;
 
     // Find the project root (directory containing project.godot) for --path.
@@ -398,44 +390,29 @@ fn strip_ansi(s: &str) -> String {
 /// Convert a `file://` URI to a local filesystem path.
 ///
 /// Handles percent-decoding and the Windows `file:///C:/...` convention.
+/// Uses case-insensitive scheme matching for robustness.
 pub fn uri_to_path(uri: &str) -> Option<PathBuf> {
-    let path_str = uri.strip_prefix("file://")?;
+    let (scheme, path_str) = uri.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("file") {
+        return None;
+    }
 
-    // Percent-decode.
-    let decoded = percent_decode(path_str);
+    let decoded = percent_encoding::percent_decode_str(path_str).decode_utf8_lossy();
 
     // On Windows, file:///C:/foo → /C:/foo — strip leading slash before drive letter.
     #[cfg(windows)]
     {
-        let trimmed = decoded.strip_prefix('/').unwrap_or(&decoded);
+        let decoded_str = decoded.as_ref();
+        let trimmed = decoded_str.strip_prefix('/').unwrap_or(decoded_str);
         if trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':' {
             return Some(PathBuf::from(trimmed));
         }
-        Some(PathBuf::from(&decoded))
+        Some(PathBuf::from(decoded_str))
     }
     #[cfg(not(windows))]
     {
-        Some(PathBuf::from(&decoded))
+        Some(PathBuf::from(decoded.as_ref()))
     }
-}
-
-/// Minimal percent-decoding for file URIs.
-fn percent_decode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(byte) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(byte as char);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i] as char);
-        i += 1;
-    }
-    out
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -554,16 +531,10 @@ res://test.gdshader:8 - Unknown identifier in expression: 'xx'. Shader compilati
         assert!(uri_to_path("https://example.com").is_none());
     }
 
-    // ── percent_decode ───────────────────────────────────────────────────────
-
     #[test]
-    fn percent_decode_spaces() {
-        assert_eq!(percent_decode("hello%20world"), "hello world");
-    }
-
-    #[test]
-    fn percent_decode_no_encoding() {
-        assert_eq!(percent_decode("hello"), "hello");
+    fn uri_to_path_case_insensitive_scheme() {
+        let p = uri_to_path("FILE:///home/user/test.gdshader");
+        assert!(p.is_some());
     }
 
     // ── extract_line_from_location ───────────────────────────────────────────

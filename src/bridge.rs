@@ -165,39 +165,18 @@ async fn handle_client_message(
     let params = parsed.get("params").cloned().unwrap_or(Value::Null);
 
     match method {
-        // Track open/closed files for workspace/symbol aggregation + shader diagnostics.
-        Some("textDocument/didOpen") => {
+        // Track open/closed files and trigger shader validation on open/change.
+        Some(method_name @ "textDocument/didOpen")
+        | Some(method_name @ "textDocument/didChange") => {
             if let Some(uri) = params
                 .get("textDocument")
                 .and_then(|td| td.get("uri"))
                 .and_then(Value::as_str)
             {
-                synth.lock().await.on_did_open(uri.to_owned());
-
-                // Trigger shader validation on open.
-                if shader::is_shader_uri(uri) {
-                    let uri_owned = uri.to_owned();
-                    let stdout_tx = to_stdout.clone();
-                    let shaders2 = Arc::clone(&shaders);
-                    let gp = (*godot_path).clone();
-                    let handle = tokio::spawn(shader::validate_shader(
-                        uri_owned.clone(),
-                        shader_timeout,
-                        gp,
-                        stdout_tx,
-                    ));
-                    shaders2.lock().await.register(uri_owned, handle);
+                if method_name == "textDocument/didOpen" {
+                    synth.lock().await.on_did_open(uri.to_owned());
                 }
-            }
-            let _ = to_tcp.send(msg);
-        }
-        // Trigger shader re-validation on change (debounced inside validate_shader).
-        Some("textDocument/didChange") => {
-            if let Some(uri) = params
-                .get("textDocument")
-                .and_then(|td| td.get("uri"))
-                .and_then(Value::as_str)
-            {
+
                 if shader::is_shader_uri(uri) {
                     let uri_owned = uri.to_owned();
                     let stdout_tx = to_stdout.clone();
