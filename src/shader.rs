@@ -81,10 +81,38 @@ const DEBOUNCE_MS: u64 = 300;
 pub async fn validate_shader(
     uri: String,
     timeout: Duration,
+    godot_path: Option<String>,
     to_stdout: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     // Debounce — if the task is aborted during this sleep, no subprocess is spawned.
     tokio::time::sleep(Duration::from_millis(DEBOUNCE_MS)).await;
+
+    // If there is no configured/discovered Godot binary, publish a single hint
+    // diagnostic so the AI client (or user) knows to set it up.
+    let godot_bin = match godot_path {
+        Some(p) => p,
+        None => {
+            let notification = make_notification(
+                "textDocument/publishDiagnostics",
+                json!({
+                    "uri": uri,
+                    "diagnostics": [{
+                        "range": {
+                            "start": { "line": 0, "character": 0 },
+                            "end":   { "line": 0, "character": 0 },
+                        },
+                        "severity": 3,
+                        "source": "gdshader",
+                        "message": "Shader diagnostics unavailable: Godot binary not found. \
+                            Run `godot-lsp-bridge config set godot-path /path/to/godot` \
+                            or add Godot to your PATH.",
+                    }],
+                }),
+            );
+            let _ = to_stdout.send(notification);
+            return;
+        }
+    };
 
     let file_path = match uri_to_path(&uri) {
         Some(p) => p,
@@ -94,7 +122,7 @@ pub async fn validate_shader(
         }
     };
 
-    let diagnostics = match run_godot_validation(&file_path, timeout).await {
+    let diagnostics = match run_godot_validation(&godot_bin, &file_path, timeout).await {
         Ok(diags) => diags,
         Err(e) => {
             warn!("shader: validation failed for {uri}: {e}");
@@ -133,7 +161,11 @@ pub fn is_shader_uri(uri: &str) -> bool {
 // ── Godot subprocess ─────────────────────────────────────────────────────────
 
 /// Write the validation script to a temp file, run Godot headless, and parse stderr.
-async fn run_godot_validation(file_path: &Path, timeout: Duration) -> anyhow::Result<Vec<Value>> {
+async fn run_godot_validation(
+    godot_bin: &str,
+    file_path: &Path,
+    timeout: Duration,
+) -> anyhow::Result<Vec<Value>> {
     use std::io::Write;
     use tokio::process::Command;
 
@@ -167,7 +199,7 @@ async fn run_godot_validation(file_path: &Path, timeout: Duration) -> anyhow::Re
     let project_root = find_project_root(file_path)
         .ok_or_else(|| anyhow::anyhow!("no project.godot found above {}", file_path.display()))?;
 
-    let mut cmd = Command::new("godot");
+    let mut cmd = Command::new(godot_bin);
     cmd.arg("--headless")
         .arg("--path")
         .arg(&project_root)
@@ -179,7 +211,7 @@ async fn run_godot_validation(file_path: &Path, timeout: Duration) -> anyhow::Re
         .stderr(std::process::Stdio::piped());
 
     debug!(
-        "shader: running godot --headless --path {} --script {} -- {res_path}",
+        "shader: running {godot_bin} --headless --path {} --script {} -- {res_path}",
         project_root.display(),
         script_path.display()
     );

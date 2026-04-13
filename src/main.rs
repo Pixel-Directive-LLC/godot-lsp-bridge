@@ -47,6 +47,11 @@ struct Cli {
     #[arg(long, default_value_t = DEFAULT_RETRY_TIMEOUT.as_secs())]
     connect_timeout: u64,
 
+    /// Path to the Godot binary for shader validation. When omitted, looks up the
+    /// config file and then PATH.
+    #[arg(long)]
+    godot_path: Option<String>,
+
     /// Timeout in seconds for the Godot shader validation subprocess [default: 10].
     #[arg(long, default_value_t = 10)]
     shader_timeout: u64,
@@ -127,6 +132,12 @@ async fn main() -> Result<()> {
     let timeout = Duration::from_secs(cli.connect_timeout);
     let shader_timeout = Duration::from_secs(cli.shader_timeout);
 
+    // Resolve Godot binary: CLI flag → config file → PATH lookup.
+    let godot_path = cli
+        .godot_path
+        .or(cfg.godot_path)
+        .or_else(resolve_godot_on_path);
+
     let port = match port_override {
         Some(p) => {
             info!("Using explicit port {p}; skipping auto-discovery");
@@ -140,7 +151,7 @@ async fn main() -> Result<()> {
         let stream = connect_with_backoff(&host, port, timeout).await?;
         info!("Bridging stdio <=> {host}:{port}");
 
-        match bridge::run(stream, shader_timeout).await? {
+        match bridge::run(stream, shader_timeout, godot_path.clone()).await? {
             RunOutcome::StdinClosed => {
                 info!("Editor closed stdin — exiting");
                 break;
@@ -169,6 +180,25 @@ impl Cli {
     fn port_or_config(&self, config_port: Option<u16>) -> u16 {
         self.port.or(config_port).unwrap_or(6005)
     }
+}
+
+/// Check if `godot` (or `godot.exe` on Windows) is on PATH.
+fn resolve_godot_on_path() -> Option<String> {
+    let names: &[&str] = if cfg!(windows) {
+        &["godot.exe", "godot.bat", "godot.cmd", "godot"]
+    } else {
+        &["godot"]
+    };
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        for name in names {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
 }
 
 /// Scan candidate ports and return the port to connect to.
@@ -227,6 +257,18 @@ mod tests {
     fn shader_timeout_parsed() {
         let cli = Cli::parse_from(["godot-lsp-bridge", "--shader-timeout", "30"]);
         assert_eq!(cli.shader_timeout, 30);
+    }
+
+    #[test]
+    fn godot_path_parsed() {
+        let cli = Cli::parse_from(["godot-lsp-bridge", "--godot-path", "/usr/bin/godot4"]);
+        assert_eq!(cli.godot_path.as_deref(), Some("/usr/bin/godot4"));
+    }
+
+    #[test]
+    fn godot_path_default_is_none() {
+        let cli = Cli::parse_from(["godot-lsp-bridge"]);
+        assert!(cli.godot_path.is_none());
     }
 
     #[test]

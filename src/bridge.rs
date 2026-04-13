@@ -42,7 +42,11 @@ pub enum RunOutcome {
 ///
 /// A graceful OS shutdown signal also terminates the loop and returns
 /// [`RunOutcome::StdinClosed`] (treated as a clean exit).
-pub async fn run(stream: TcpStream, shader_timeout: Duration) -> Result<RunOutcome> {
+pub async fn run(
+    stream: TcpStream,
+    shader_timeout: Duration,
+    godot_path: Option<String>,
+) -> Result<RunOutcome> {
     let (tcp_rx, tcp_tx) = stream.into_split();
 
     // Channel: messages destined for the Godot TCP socket.
@@ -52,6 +56,7 @@ pub async fn run(stream: TcpStream, shader_timeout: Duration) -> Result<RunOutco
 
     let synth = Arc::new(Mutex::new(Synthesizer::new()));
     let shaders = Arc::new(Mutex::new(ShaderState::default()));
+    let godot_path = Arc::new(godot_path);
 
     let outcome = tokio::select! {
         outcome = stdin_loop(
@@ -59,6 +64,7 @@ pub async fn run(stream: TcpStream, shader_timeout: Duration) -> Result<RunOutco
             Arc::clone(&synth),
             Arc::clone(&shaders),
             shader_timeout,
+            Arc::clone(&godot_path),
             to_tcp_tx.clone(),
             to_stdout_tx.clone(),
         ) => outcome,
@@ -100,6 +106,7 @@ async fn stdin_loop(
     synth: Arc<Mutex<Synthesizer>>,
     shaders: Arc<Mutex<ShaderState>>,
     shader_timeout: Duration,
+    godot_path: Arc<Option<String>>,
     to_tcp: mpsc::UnboundedSender<Vec<u8>>,
     to_stdout: mpsc::UnboundedSender<Vec<u8>>,
 ) -> RunOutcome {
@@ -111,6 +118,7 @@ async fn stdin_loop(
                     Arc::clone(&synth),
                     Arc::clone(&shaders),
                     shader_timeout,
+                    Arc::clone(&godot_path),
                     &to_tcp,
                     &to_stdout,
                 )
@@ -139,6 +147,7 @@ async fn handle_client_message(
     synth: Arc<Mutex<Synthesizer>>,
     shaders: Arc<Mutex<ShaderState>>,
     shader_timeout: Duration,
+    godot_path: Arc<Option<String>>,
     to_tcp: &mpsc::UnboundedSender<Vec<u8>>,
     to_stdout: &mpsc::UnboundedSender<Vec<u8>>,
 ) {
@@ -170,9 +179,11 @@ async fn handle_client_message(
                     let uri_owned = uri.to_owned();
                     let stdout_tx = to_stdout.clone();
                     let shaders2 = Arc::clone(&shaders);
+                    let gp = (*godot_path).clone();
                     let handle = tokio::spawn(shader::validate_shader(
                         uri_owned.clone(),
                         shader_timeout,
+                        gp,
                         stdout_tx,
                     ));
                     shaders2.lock().await.register(uri_owned, handle);
@@ -191,9 +202,11 @@ async fn handle_client_message(
                     let uri_owned = uri.to_owned();
                     let stdout_tx = to_stdout.clone();
                     let shaders2 = Arc::clone(&shaders);
+                    let gp = (*godot_path).clone();
                     let handle = tokio::spawn(shader::validate_shader(
                         uri_owned.clone(),
                         shader_timeout,
+                        gp,
                         stdout_tx,
                     ));
                     shaders2.lock().await.register(uri_owned, handle);
