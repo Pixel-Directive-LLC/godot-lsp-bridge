@@ -7,4 +7,5 @@
 pub mod bridge;
 pub mod discovery;
 pub mod framing;
+pub mod shader;
 pub mod synthesizer;

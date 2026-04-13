@@ -17,6 +17,9 @@ pub struct Config {
     pub host: Option<String>,
     /// Persistent port override (equivalent to `--port`).
     pub port: Option<u16>,
+    /// Path to the Godot binary (equivalent to `--godot-path`).
+    #[serde(rename = "godot-path")]
+    pub godot_path: Option<String>,
 }
 
 /// Returns the platform-appropriate config file path.
@@ -65,7 +68,11 @@ pub fn get(key: &str) -> Result<()> {
             Some(v) => println!("{v}"),
             None => println!("(not set)"),
         },
-        _ => anyhow::bail!("unknown key {key:?}; valid keys: host, port"),
+        "godot-path" => match cfg.godot_path {
+            Some(v) => println!("{v}"),
+            None => println!("(not set)"),
+        },
+        _ => anyhow::bail!("unknown key {key:?}; valid keys: host, port, godot-path"),
     }
     Ok(())
 }
@@ -81,7 +88,8 @@ pub fn set(key: &str, value: &str) -> Result<()> {
                 .with_context(|| format!("invalid port {value:?}: must be a number 1–65535"))?;
             cfg.port = Some(port);
         }
-        _ => anyhow::bail!("unknown key {key:?}; valid keys: host, port"),
+        "godot-path" => cfg.godot_path = Some(value.to_owned()),
+        _ => anyhow::bail!("unknown key {key:?}; valid keys: host, port, godot-path"),
     }
     save(&cfg)?;
     let path = config_path()?;

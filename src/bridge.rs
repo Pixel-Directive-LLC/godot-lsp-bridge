@@ -14,10 +14,12 @@
 //! (TCP closed) or exit (stdin closed).
 
 use crate::framing;
+use crate::shader::{self, ShaderState};
 use crate::synthesizer::Synthesizer;
 use anyhow::Result;
 use serde_json::Value;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::{self, BufReader, BufWriter};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
@@ -40,7 +42,11 @@ pub enum RunOutcome {
 ///
 /// A graceful OS shutdown signal also terminates the loop and returns
 /// [`RunOutcome::StdinClosed`] (treated as a clean exit).
-pub async fn run(stream: TcpStream) -> Result<RunOutcome> {
+pub async fn run(
+    stream: TcpStream,
+    shader_timeout: Duration,
+    godot_path: Option<String>,
+) -> Result<RunOutcome> {
     let (tcp_rx, tcp_tx) = stream.into_split();
 
     // Channel: messages destined for the Godot TCP socket.
@@ -49,11 +55,16 @@ pub async fn run(stream: TcpStream) -> Result<RunOutcome> {
     let (to_stdout_tx, to_stdout_rx) = mpsc::unbounded_channel::<Vec<u8>>();
 
     let synth = Arc::new(Mutex::new(Synthesizer::new()));
+    let shaders = Arc::new(Mutex::new(ShaderState::default()));
+    let godot_path = Arc::new(godot_path);
 
     let outcome = tokio::select! {
         outcome = stdin_loop(
             BufReader::new(io::stdin()),
             Arc::clone(&synth),
+            Arc::clone(&shaders),
+            shader_timeout,
+            Arc::clone(&godot_path),
             to_tcp_tx.clone(),
             to_stdout_tx.clone(),
         ) => outcome,
@@ -93,13 +104,25 @@ pub async fn run(stream: TcpStream) -> Result<RunOutcome> {
 async fn stdin_loop(
     mut stdin: BufReader<io::Stdin>,
     synth: Arc<Mutex<Synthesizer>>,
+    shaders: Arc<Mutex<ShaderState>>,
+    shader_timeout: Duration,
+    godot_path: Arc<Option<String>>,
     to_tcp: mpsc::UnboundedSender<Vec<u8>>,
     to_stdout: mpsc::UnboundedSender<Vec<u8>>,
 ) -> RunOutcome {
     loop {
         match framing::read_message(&mut stdin).await {
             Ok(Some(msg)) => {
-                handle_client_message(msg, Arc::clone(&synth), &to_tcp, &to_stdout).await;
+                handle_client_message(
+                    msg,
+                    Arc::clone(&synth),
+                    Arc::clone(&shaders),
+                    shader_timeout,
+                    Arc::clone(&godot_path),
+                    &to_tcp,
+                    &to_stdout,
+                )
+                .await;
             }
             Ok(None) => return RunOutcome::StdinClosed,
             Err(e) => {
@@ -113,12 +136,18 @@ async fn stdin_loop(
 /// Inspect and route one client message.
 ///
 /// - `textDocument/didOpen` / `didClose`: update open-file state, then pass through.
+///   For `.gdshader` files, also trigger shader validation or clear diagnostics.
+/// - `textDocument/didChange`: pass through; for `.gdshader` files, trigger debounced
+///   re-validation.
 /// - `workspace/symbol`, `prepareCallHierarchy`, `callHierarchy/*`: intercept and
 ///   spawn a synthesis task.
 /// - Everything else: pass through unchanged.
 async fn handle_client_message(
     msg: Vec<u8>,
     synth: Arc<Mutex<Synthesizer>>,
+    shaders: Arc<Mutex<ShaderState>>,
+    shader_timeout: Duration,
+    godot_path: Arc<Option<String>>,
     to_tcp: &mpsc::UnboundedSender<Vec<u8>>,
     to_stdout: &mpsc::UnboundedSender<Vec<u8>>,
 ) {
@@ -136,14 +165,31 @@ async fn handle_client_message(
     let params = parsed.get("params").cloned().unwrap_or(Value::Null);
 
     match method {
-        // Track open/closed files for workspace/symbol aggregation.
-        Some("textDocument/didOpen") => {
+        // Track open/closed files and trigger shader validation on open/change.
+        Some(method_name @ "textDocument/didOpen")
+        | Some(method_name @ "textDocument/didChange") => {
             if let Some(uri) = params
                 .get("textDocument")
                 .and_then(|td| td.get("uri"))
                 .and_then(Value::as_str)
             {
-                synth.lock().await.on_did_open(uri.to_owned());
+                if method_name == "textDocument/didOpen" {
+                    synth.lock().await.on_did_open(uri.to_owned());
+                }
+
+                if shader::is_shader_uri(uri) {
+                    let uri_owned = uri.to_owned();
+                    let stdout_tx = to_stdout.clone();
+                    let shaders2 = Arc::clone(&shaders);
+                    let gp = (*godot_path).clone();
+                    let handle = tokio::spawn(shader::validate_shader(
+                        uri_owned.clone(),
+                        shader_timeout,
+                        gp,
+                        stdout_tx,
+                    ));
+                    shaders2.lock().await.register(uri_owned, handle);
+                }
             }
             let _ = to_tcp.send(msg);
         }
@@ -154,6 +200,12 @@ async fn handle_client_message(
                 .and_then(Value::as_str)
             {
                 synth.lock().await.on_did_close(uri);
+
+                // Clear shader diagnostics and cancel any in-flight validation.
+                if shader::is_shader_uri(uri) {
+                    shaders.lock().await.remove(uri);
+                    shader::clear_diagnostics(uri, to_stdout);
+                }
             }
             let _ = to_tcp.send(msg);
         }

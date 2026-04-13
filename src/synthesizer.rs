@@ -116,6 +116,16 @@ pub fn make_response(id: &Value, result: Value) -> Vec<u8> {
     .expect("infallible JSON serialisation")
 }
 
+/// Serialise a JSON-RPC notification body with `method` and `params` (no `id`).
+pub fn make_notification(method: &str, params: Value) -> Vec<u8> {
+    serde_json::to_vec(&json!({
+        "jsonrpc": "2.0",
+        "method":  method,
+        "params":  params,
+    }))
+    .expect("infallible JSON serialisation")
+}
+
 /// Serialise a JSON-RPC error response body with `id`, `code`, and `message`.
 pub fn make_error(id: &Value, code: i64, message: &str) -> Vec<u8> {
     serde_json::to_vec(&json!({
@@ -674,6 +684,18 @@ mod tests {
         let v: Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(v["id"], 1);
         assert!(v["result"].is_array());
+    }
+
+    #[test]
+    fn make_notification_round_trip() {
+        let body = make_notification(
+            "textDocument/publishDiagnostics",
+            json!({"uri": "file://x.gdshader", "diagnostics": []}),
+        );
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["jsonrpc"], "2.0");
+        assert_eq!(v["method"], "textDocument/publishDiagnostics");
+        assert!(v.get("id").is_none());
     }
 
     #[test]
