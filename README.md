@@ -7,7 +7,7 @@
 └──────────────────────────────────────────────┘
 ```
 
-Full GDScript code intelligence — go-to-definition, hover docs, completions, and diagnostics — inside **Claude Code**, powered by Godot's native Language Server.
+Full GDScript code intelligence — go-to-definition, hover docs, completions, diagnostics, and **GDShader validation** — inside **Claude Code**, powered by Godot's native Language Server.
 
 ---
 
@@ -67,6 +67,7 @@ That's it. Open Godot with a project, open any `.gd` file in Claude Code, and GD
 ## Features
 
 - **Full GDScript intelligence** — go-to-definition, hover docs, completions, and diagnostics powered by Godot's native LSP
+- **GDShader diagnostics** — validates `.gdshader` files by running Godot headless, surfacing shader compilation errors as LSP diagnostics with line-accurate ranges
 - **Auto-discovery** — scans ports 6005–6014 and connects to the running Godot instance automatically
 - **Retry on startup** — exponential-backoff probe when Godot hasn't launched yet; no manual restarts needed
 - **Hot-reconnect** — detects in-session project switches and reconnects without restarting Claude Code
@@ -80,7 +81,7 @@ That's it. Open Godot with a project, open any `.gd` file in Claude Code, and GD
 
 ### Proxy flags
 
-All flags below are **stable** as of v1.0.
+All flags below are **stable** as of v1.0. Shader flags added in v1.3.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -88,9 +89,11 @@ All flags below are **stable** as of v1.0.
 | `--host <ADDR>` | `127.0.0.1` | Godot LSP host |
 | `--port <N>` | *(auto-detect)* | Skip discovery; connect to explicit port |
 | `--connect-timeout <SECS>` | `300` | Max wait time for Godot to appear |
+| `--godot-path <PATH>` | *(auto-detect)* | Path to the Godot binary for shader validation |
+| `--shader-timeout <SECS>` | `10` | Timeout for the Godot shader validation subprocess |
 | `--log-level <LEVEL>` | `info` | Tracing level (`error`/`warn`/`info`/`debug`/`trace`) |
 
-Resolution order for `--host` and `--port`: CLI flag → config file → built-in default.
+Resolution order for `--host`, `--port`, and `--godot-path`: CLI flag → config file → built-in default (PATH lookup for Godot).
 
 The `RUST_LOG` environment variable is also honoured (tracing-subscriber env-filter).
 
@@ -150,16 +153,18 @@ Read or write persistent host/port defaults. Settings are stored in a JSON file 
 | macOS | `~/Library/Application Support/godot-lsp-bridge/config.json` |
 | Linux | `~/.config/godot-lsp-bridge/config.json` |
 
-Supported keys: `host`, `port`.
+Supported keys: `host`, `port`, `godot-path`.
 
 ```bash
 # Read a value (prints "(not set)" if absent)
 godot-lsp-bridge config get host
 godot-lsp-bridge config get port
+godot-lsp-bridge config get godot-path
 
 # Write a value
 godot-lsp-bridge config set host 192.168.1.10
 godot-lsp-bridge config set port 6007
+godot-lsp-bridge config set godot-path /usr/bin/godot4
 ```
 
 ---
@@ -180,7 +185,8 @@ Godot's available primitives.
 | `textDocument/documentSymbol` | Native | Symbols in current file |
 | `textDocument/signatureHelp` | Native | Function signature hints |
 | `textDocument/didOpen` / `didChange` / `didClose` | Native | Document sync |
-| `textDocument/publishDiagnostics` | Pass-through | Server-push notification; forwarded intact |
+| `textDocument/publishDiagnostics` | Pass-through | Server-push notification; forwarded intact for GDScript |
+| `.gdshader` diagnostics | **Synthesised** | Runs Godot headless to compile shaders; publishes errors as `publishDiagnostics` |
 | `workspace/symbol` | **Synthesised** | Aggregates `documentSymbol` across open files; filters by query string |
 | `textDocument/prepareCallHierarchy` | **Synthesised** | Resolves the symbol at the cursor via `documentSymbol` |
 | `callHierarchy/incomingCalls` | **Synthesised** | Finds callers via `references` at the item's selection range |
@@ -236,12 +242,6 @@ cargo nextest run --ignored
 
 # Build release
 cargo build --release
-```
-
-Or install the HEAD revision directly without cloning:
-
-```bash
-cargo install --git https://github.com/Pixel-Directive-LLC/godot-lsp-bridge
 ```
 
 </details>
