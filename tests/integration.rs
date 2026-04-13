@@ -119,7 +119,9 @@ async fn bridge_runs_against_live_godot() {
 
     // bridge::run reads from stdin; in the test runner stdin has no LSP payload so
     // read_message returns Ok(None) immediately → RunOutcome::StdinClosed.
-    let outcome = run(stream).await.expect("bridge::run returned an error");
+    let outcome = run(stream, std::time::Duration::from_secs(10))
+        .await
+        .expect("bridge::run returned an error");
     assert_eq!(
         outcome,
         RunOutcome::StdinClosed,

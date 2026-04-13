@@ -43,6 +43,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # Platform config/home directory resolution
 dirs = "5"
 
+# Temporary files for shader validation script
+tempfile = "3"
+
 # Archive extraction for update subcommand
 flate2 = "1"
 tar    = "0.4"

@@ -47,6 +47,10 @@ struct Cli {
     #[arg(long, default_value_t = DEFAULT_RETRY_TIMEOUT.as_secs())]
     connect_timeout: u64,
 
+    /// Timeout in seconds for the Godot shader validation subprocess [default: 10].
+    #[arg(long, default_value_t = 10)]
+    shader_timeout: u64,
+
     /// Tracing log level (error, warn, info, debug, or trace).
     #[arg(long, default_value = "info")]
     log_level: String,
@@ -121,6 +125,7 @@ async fn main() -> Result<()> {
     let host = cli.host_or_config(cfg.host.as_deref());
     let port_override = cli.port.or(cfg.port);
     let timeout = Duration::from_secs(cli.connect_timeout);
+    let shader_timeout = Duration::from_secs(cli.shader_timeout);
 
     let port = match port_override {
         Some(p) => {
@@ -135,7 +140,7 @@ async fn main() -> Result<()> {
         let stream = connect_with_backoff(&host, port, timeout).await?;
         info!("Bridging stdio <=> {host}:{port}");
 
-        match bridge::run(stream).await? {
+        match bridge::run(stream, shader_timeout).await? {
             RunOutcome::StdinClosed => {
                 info!("Editor closed stdin — exiting");
                 break;
@@ -213,8 +218,15 @@ mod tests {
         assert!(cli.host.is_none());
         assert!(cli.port.is_none());
         assert_eq!(cli.connect_timeout, DEFAULT_RETRY_TIMEOUT.as_secs());
+        assert_eq!(cli.shader_timeout, 10);
         assert_eq!(cli.log_level, "info");
         assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn shader_timeout_parsed() {
+        let cli = Cli::parse_from(["godot-lsp-bridge", "--shader-timeout", "30"]);
+        assert_eq!(cli.shader_timeout, 30);
     }
 
     #[test]
